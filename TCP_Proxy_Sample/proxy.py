@@ -1,5 +1,9 @@
 import socket
+import os
+import importlib
 from threading import Thread
+
+import parser
 
 class ProxyToServer(Thread):
 
@@ -17,7 +21,12 @@ class ProxyToServer(Thread):
     while True:
       data = self.server.recv(4096)
       if data:
-        print ("[{}] <- {}".format(self.port, data[:100].hex()))
+        #Realtime updating of parser without restarting proxy
+        try:
+          importlib.reload(parser)
+          parser.parse(data, self.port, 'server')
+        except Exception as e:
+          print('server[{}]'.format(self.port),e)
         # forward to client
         self.game.sendall(data)
 
@@ -38,7 +47,12 @@ class GameToProxy(Thread):
     while True:
       data = self.game.recv(4096)
       if data:
-        print ("[{}] -> {}".format(self.port, data[:100].hex()))
+        #Realtime updating of parser without restarting proxy
+        try:
+          importlib.reload(parser)
+          parser.parse(data, self.port, 'client')
+        except Exception as e:
+          print('client[{}]'.format(self.port),e)
         #forward to server
         self.server.sendall(data)
 
@@ -69,3 +83,12 @@ class Proxy(Thread):
 if __name__ == "__main__":
   master_server = Proxy('0.0.0.0', '127.0.0.1', 3344, 3333)
   master_server.start()
+
+  #execute commands while monitoring is running
+  while True:
+    try:
+      cmd = input('$ ')
+      if cmd[:4] == 'quit':
+        os._exit(0)
+    except Exception as e:
+      print(e)
